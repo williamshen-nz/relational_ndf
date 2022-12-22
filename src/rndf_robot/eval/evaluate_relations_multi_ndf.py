@@ -22,6 +22,7 @@ from airobot.sensor.camera.rgbdcam_pybullet import RGBDCameraPybullet
 from matplotlib import pyplot as plt
 
 import rndf_robot.model.vnn_occupancy_net_pointnet_dgcnn as vnn_occupancy_network
+from rndf_robot.config.default_nerf_cfg import get_nerf_cfg
 from rndf_robot.utils import util, path_util
 
 from rndf_robot.opt.optimizer import OccNetOptimizer
@@ -171,6 +172,13 @@ def main(args):
     cam_info['pose_world'] = []
     for cam in cams.cams:
         cam_info['pose_world'].append(util.pose_from_matrix(cam.cam_ext_mat))
+
+    # NeRF Cameras
+    nerf_cfg = get_nerf_cfg()
+    nerf_cams = MultiCams(nerf_cfg.CAMERA, pb_client, n_cams=nerf_cfg.N_CAMERAS)
+    nerf_cam_info = {"pose_world": []}
+    for cam in nerf_cams.cams:
+        nerf_cam_info['pose_world'].append(util.pose_from_matrix(cam.cam_ext_mat))
 
     #####################################################################################
     # load all the multi class mesh info
