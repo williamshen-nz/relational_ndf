@@ -17,8 +17,9 @@ import meshcat
 
 from airobot import log_info, log_warn, log_debug, log_critical, set_log_level
 from airobot.utils import common
-from airobot.utils.pb_util import create_pybullet_client
+from airobot.utils.pb_util import create_pybullet_client, TextureModder
 from airobot.sensor.camera.rgbdcam_pybullet import RGBDCameraPybullet
+from matplotlib import pyplot as plt
 
 import rndf_robot.model.vnn_occupancy_net_pointnet_dgcnn as vnn_occupancy_network
 from rndf_robot.utils import util, path_util
@@ -27,6 +28,7 @@ from rndf_robot.opt.optimizer import OccNetOptimizer
 from rndf_robot.robot.multicam import MultiCams
 from rndf_robot.config.default_eval_cfg import get_eval_cfg_defaults
 from rndf_robot.share.globals import bad_shapenet_mug_ids_list, bad_shapenet_bowls_ids_list, bad_shapenet_bottles_ids_list
+from rndf_robot.utils.path_util import get_rndf_assets
 from rndf_robot.utils.pb2mc.pybullet_meshcat import PyBulletMeshcat
 from rndf_robot.utils.eval_gen_utils import constraint_obj_world, safeCollisionFilterPair, safeRemoveConstraint
 
@@ -265,7 +267,7 @@ def main(args):
         elif object_class == 'bowl':
             avoid_ids = bad_shapenet_bowls_ids_list + cfg.BOWL.AVOID_SHAPENET_IDS
         elif object_class == 'bottle':
-            avoid_ids = bad_shapenet_bottles_ids_list + cfg.BOTTLE.AVOID_SHAPENET_IDS 
+            avoid_ids = bad_shapenet_bottles_ids_list + cfg.BOTTLE.AVOID_SHAPENET_IDS
         else:
             avoid_ids = []
 
@@ -281,17 +283,17 @@ def main(args):
     pc_master_dict['child']['yhl'] = [-0.2, -0.3]
     # pc_master_dict['child']['yhl'] = [-0.075, y_low]
     # pc_master_dict['child']['yhl'] = [-0.05, y_low]
-    
+
     # get the class specific ranges for scaling the objects
     for pc in pcl:
         if pc_master_dict[pc]['class'] == 'mug':
-            pc_master_dict[pc]['scale_hl'] = [0.35, 0.25] 
+            pc_master_dict[pc]['scale_hl'] = [0.35, 0.25]
             pc_master_dict[pc]['scale_default'] = 0.3
         if pc_master_dict[pc]['class'] == 'bowl':
-            pc_master_dict[pc]['scale_hl'] = [0.325, 0.15] 
+            pc_master_dict[pc]['scale_hl'] = [0.325, 0.15]
             pc_master_dict[pc]['scale_default'] = 0.3
         if pc_master_dict[pc]['class'] == 'bottle':
-            pc_master_dict[pc]['scale_hl'] = [0.35, 0.2] 
+            pc_master_dict[pc]['scale_hl'] = [0.35, 0.2]
             pc_master_dict[pc]['scale_default'] = 0.3
         if pc_master_dict[pc]['class'] == 'syn_rack_easy':
             # pc_master_dict[pc]['scale_hl'] = [1.1, 0.9]
@@ -336,11 +338,11 @@ def main(args):
 
     # load data from demos in case we want to test on the shapes we trained on
     for pc in pcl:
-        pc_master_dict[pc]['demo_ids'] = [dat['multi_object_ids'].item()[pc] for dat in demos] 
-        pc_master_dict[pc]['demo_start_poses'] = [dat['multi_obj_start_obj_pose'].item()[pc] for dat in demos] 
+        pc_master_dict[pc]['demo_ids'] = [dat['multi_object_ids'].item()[pc] for dat in demos]
+        pc_master_dict[pc]['demo_start_poses'] = [dat['multi_obj_start_obj_pose'].item()[pc] for dat in demos]
 
     #####################################################################################
-    # prepare the target descriptors 
+    # prepare the target descriptors
 
     target_desc_subdir = create_target_desc_subdir(demo_path, parent_model_path, child_model_path)
     target_desc_fname = osp.join(demo_path, target_desc_subdir, args.target_desc_name)
@@ -354,18 +356,18 @@ def main(args):
             else:
                 add_noise = False
                 noise_value = 0.0001
-            
+
             if parent_class == 'syn_container' and child_class == 'bottle':
                 use_keypoint_offset = True
                 keypoint_offset_params = {'offset': 0.025, 'type': 'bottom'}
             else:
-                use_keypoint_offset = False 
+                use_keypoint_offset = False
                 keypoint_offset_params = None
             create_target_descriptors(
-                parent_model, child_model, pc_master_dict, target_desc_fname, 
-                cfg, query_scale=args.query_scale, scale_pcds=False, 
+                parent_model, child_model, pc_master_dict, target_desc_fname,
+                cfg, query_scale=args.query_scale, scale_pcds=False,
                 target_rounds=args.target_rounds, pc_reference=args.pc_reference,
-                skip_alignment=args.skip_alignment, n_demos=n_demos, manual_target_idx=args.target_idx, 
+                skip_alignment=args.skip_alignment, n_demos=n_demos, manual_target_idx=args.target_idx,
                 add_noise=add_noise, interaction_pt_noise_std=noise_value,
                 use_keypoint_offset=use_keypoint_offset, keypoint_offset_params=keypoint_offset_params,
                 visualize=True, mc_vis=mc_vis)
@@ -420,7 +422,18 @@ def main(args):
                             cfg.TABLE_POS,
                             cfg.TABLE_ORI,
                             scaling=1.0)
+
+    # Apply texture to table
+    # table_texture_path = osp.join(path_util.get_rndf_descriptions(), 'hanging/table_w_material/table.png')
+    table_texture_path = osp.join(get_rndf_assets(), "table.png")
+    texture_modder = TextureModder(pb_client.get_client_id())
+    texture_modder.set_texture_path(osp.join(get_rndf_assets(), "dtd-r1.0.1/dtd/images"))
+    texture_modder.set_texture(table_id, 0, table_texture_path)
     recorder.register_object(table_id, table_urdf_fname)
+
+    # Add plane
+    plane_id = pb_client.load_urdf("plane.urdf")
+    # recorder.register_object(plane_id, osp.join(pybullet_data.getDataPath(), "plane.urdf"))
 
     rec_stop_event = threading.Event()
     rec_run_event = threading.Event()
@@ -462,7 +475,7 @@ def main(args):
     for iteration in range(args.start_iteration, args.num_iterations):
         #####################################################################################
         # set up the trial
-        
+
         demo_idx = np.random.randint(len(demos))
         demo = demos[demo_idx]
         if args.test_on_train:
@@ -471,7 +484,7 @@ def main(args):
         else:
             parent_id = random.sample(pc_master_dict['parent']['test_ids'], 1)[0]
             child_id = random.sample(pc_master_dict['child']['test_ids'], 1)[0]
-        
+
         if '_dec' in parent_id:
             parent_id = parent_id.replace('_dec', '')
         if '_dec' in child_id:
@@ -562,7 +575,7 @@ def main(args):
             bottle_flat = np.hstack([bottle_2d, np.zeros(bottle_2d.shape[0]).reshape(-1, 1)])
 
             container_box = trimesh.PointCloud(container_flat).bounding_box
-            bottle_box = trimesh.PointCloud(bottle_flat).bounding_box 
+            bottle_box = trimesh.PointCloud(bottle_flat).bounding_box
 
             with recorder.meshcat_scene_lock:
                 util.meshcat_trimesh_show(mc_vis, 'scene/container_box', container_box.to_mesh().apply_translation([0.0, 0.2, 0.0]), color=(255, 0, 0))
@@ -667,7 +680,11 @@ def main(args):
                 collifile=obj_obj_file_dec,
                 base_pos=pos,
                 base_ori=ori)
-            
+
+            # change the texture
+            texture_modder.rand_texture(obj_id, -1)
+            # texture_modder.rand_rgb(obj_id, -1)
+
             # register the object with the meshcat visualizer
             recorder.register_object(obj_id, obj_obj_file_dec, scaling=mesh_scale)
 
@@ -698,13 +715,17 @@ def main(args):
         pc_obs_info['pcd'] = {}
         pc_obs_info['pcd_pts'] = {}
         pc_obs_info['pcd_pts']['parent'] = []
-        pc_obs_info['pcd_pts']['child'] = [] 
+        pc_obs_info['pcd_pts']['child'] = []
 
         obj_pose_world = p.getBasePositionAndOrientation(obj_id)
         obj_pose_world = util.list2pose_stamped(list(obj_pose_world[0]) + list(obj_pose_world[1]))
-        for i, cam in enumerate(cams.cams): 
+        for i, cam in enumerate(cams.cams):
             # get image and raw point cloud
             rgb, depth, seg = cam.get_images(get_rgb=True, get_depth=True, get_seg=True)
+            # plt.figure()
+            # plt.imshow(rgb)
+            # plt.title(f"{iteration}_cam{i}_rgb")
+            # plt.show()
             pts_raw, _ = cam.get_pcd(in_world=True, rgb_image=rgb, depth_image=depth, depth_min=0.0, depth_max=np.inf)
 
             # flatten and find corresponding pixels in segmentation mask
@@ -714,22 +735,22 @@ def main(args):
             for pc in pcl:
                 obj_id = pc_master_dict[pc]['pb_obj_id']
                 obj_inds = np.where(flat_seg == obj_id)
-                seg_depth = flat_depth[obj_inds[0]]  
-                
+                seg_depth = flat_depth[obj_inds[0]]
+
                 obj_pts = pts_raw[obj_inds[0], :]
                 # obj_pcd_pts.append(util.crop_pcd(obj_pts))
                 pc_obs_info['pcd_pts'][pc].append(util.crop_pcd(obj_pts))
 
             depth_imgs.append(seg_depth)
             seg_idxs.append(obj_inds)
-        
+
         # merge point clouds from different views, and filter weird artifacts away from the object
         for pc, obj_pcd_pts in pc_obs_info['pcd_pts'].items():
             target_obj_pcd_obs = np.concatenate(obj_pcd_pts, axis=0)  # object shape point cloud
             target_pts_mean = np.mean(target_obj_pcd_obs, axis=0)
             inliers = np.where(np.linalg.norm(target_obj_pcd_obs - target_pts_mean, 2, 1) < 0.2)[0]
             target_obj_pcd_obs = target_obj_pcd_obs[inliers]
-            
+
             pc_obs_info['pcd'][pc] = target_obj_pcd_obs
 
         parent_pcd = pc_obs_info['pcd']['parent']
@@ -740,11 +761,11 @@ def main(args):
         child_model.load_state_dict(torch.load(child_model_path))
         pause_mc_thread(True)
         relative_trans = infer_relation_intersection(
-            mc_vis, parent_optimizer, child_optimizer, 
-            parent_overall_target_desc, child_overall_target_desc, 
+            mc_vis, parent_optimizer, child_optimizer,
+            parent_overall_target_desc, child_overall_target_desc,
             parent_pcd, child_pcd, parent_query_points, child_query_points, opt_visualize=args.opt_visualize)
         pause_mc_thread(False)
-        
+
         time.sleep(1.0)
 
         # apply the inferred transformation by updating the pose of the child object
@@ -793,7 +814,7 @@ def main(args):
 
         # evaluation criteria
         time.sleep(2.0)
-        
+
         success_crit_dict = {}
         kvs = {}
 
@@ -824,7 +845,7 @@ def main(args):
         # remove constraints, if there are any
         safeRemoveConstraint(pc_master_dict['parent']['o_cid'])
         safeRemoveConstraint(pc_master_dict['child']['o_cid'])
-        
+
         # first, reset everything
         pb_client.reset_body(parent_obj_id, start_parent_pose[:3], start_parent_pose[3:])
         pb_client.reset_body(child_obj_id, start_child_pose[:3], start_child_pose[3:])
@@ -836,8 +857,8 @@ def main(args):
         parent_upside_down_pose_list = util.pose_stamped2list(util.pose_from_matrix(upside_down_pose_mat))
 
         # reset parent to this state and constrain to world
-        pb_client.reset_body(parent_obj_id, parent_upside_down_pose_list[:3], parent_upside_down_pose_list[3:]) 
-        ud_cid = constraint_obj_world(parent_obj_id, parent_upside_down_pose_list[:3], parent_upside_down_pose_list[3:]) 
+        pb_client.reset_body(parent_obj_id, parent_upside_down_pose_list[:3], parent_upside_down_pose_list[3:])
+        ud_cid = constraint_obj_world(parent_obj_id, parent_upside_down_pose_list[:3], parent_upside_down_pose_list[3:])
 
         # get the final relative pose of the child object
         final_child_pose_parent = util.convert_reference_frame(
@@ -855,7 +876,7 @@ def main(args):
         final_child_pose_upside_down_mat = util.matrix_from_pose(final_child_pose_upside_down)
 
         # reset child to this state
-        pb_client.reset_body(child_obj_id, final_child_pose_upside_down_list[:3], final_child_pose_upside_down_list[3:]) 
+        pb_client.reset_body(child_obj_id, final_child_pose_upside_down_list[:3], final_child_pose_upside_down_list[3:])
 
         # turn on the simulation and wait for a couple seconds
         pb_client.set_step_sim(False)
@@ -869,7 +890,7 @@ def main(args):
         #########################################################################
 
         place_success = np.all(np.asarray(list(success_crit_dict.values())))
-        
+
         place_success_list.append(place_success)
         log_str = 'Iteration: %d, ' % iteration
 
