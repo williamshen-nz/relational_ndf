@@ -114,6 +114,13 @@ def main(args):
     mc_vis['scene'].delete()
 
     pb_client = create_pybullet_client(gui=args.pybullet_viz, opengl_render=True, realtime=True, server=args.pybullet_server)
+    # Disable preview to make things faster
+    enable = False
+    p.configureDebugVisualizer(p.COV_ENABLE_GUI, enable, physicsClientId=pb_client.get_client_id())
+    p.configureDebugVisualizer(p.COV_ENABLE_RGB_BUFFER_PREVIEW, enable, physicsClientId=pb_client.get_client_id())
+    p.configureDebugVisualizer(p.COV_ENABLE_DEPTH_BUFFER_PREVIEW, enable, physicsClientId=pb_client.get_client_id())
+    p.configureDebugVisualizer(p.COV_ENABLE_SEGMENTATION_MARK_PREVIEW, enable, physicsClientId=pb_client.get_client_id())
+
     recorder = PyBulletMeshcat(pb_client=pb_client)
     recorder.clear()
 
