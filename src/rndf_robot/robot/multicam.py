@@ -1,3 +1,4 @@
+import numpy as np
 from yacs.config import CfgNode as CN
 from airobot.sensor.camera.rgbdcam_pybullet import RGBDCameraPybullet
 
@@ -71,3 +72,32 @@ class MultiCams:
                 pitch=self.cam_setup_cfg['pitch'][i],
                 roll=self.cam_setup_cfg['roll'][i]
             )
+
+    @property
+    def width(self) -> float:
+        widths = [cam.img_width for cam in self.cams]
+        assert len(set(widths)) == 1, 'All cameras must have the same width'
+        return widths[0]
+
+    @property
+    def height(self) -> float:
+        heights = [cam.img_height for cam in self.cams]
+        assert len(set(heights)) == 1, 'All cameras must have the same height'
+        return heights[0]
+
+    @property
+    def intrinsic_matrix(self) -> np.ndarray:
+        """
+        Returns the intrinsic matrix of the camera
+
+        Returns:
+            np.array: Intrinsic matrix
+        """
+        intrinsic_matrices = [
+            cam.cam_int_mat for cam in self.cams
+        ]
+        # Check intrinsics are all close, as we should be using the same camera
+        for i in range(1, len(intrinsic_matrices)):
+            assert np.allclose(intrinsic_matrices[0], intrinsic_matrices[i])
+        return intrinsic_matrices[0]
+

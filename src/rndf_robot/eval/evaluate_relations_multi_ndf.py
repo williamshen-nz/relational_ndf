@@ -23,6 +23,7 @@ from matplotlib import pyplot as plt
 
 import rndf_robot.model.vnn_occupancy_net_pointnet_dgcnn as vnn_occupancy_network
 from rndf_robot.config.default_nerf_cfg import get_nerf_cfg
+from rndf_robot.nerf.dataset import write_instant_ngp_dataset
 from rndf_robot.utils import util, path_util
 
 from rndf_robot.opt.optimizer import OccNetOptimizer
@@ -975,15 +976,8 @@ def main(args):
         # Write NeRF images
         nerf_dir = osp.join(eval_iter_dir, 'nerf_dataset')
         util.safe_makedirs(nerf_dir)
-        util.safe_makedirs(osp.join(nerf_dir, 'rgbs'))
-        util.safe_makedirs(osp.join(nerf_dir, 'depths'))
-
-        for i, (rgb, depth) in enumerate(zip(nerf_rgbs, nerf_depths)):
-            fname = f"{i:03d}.png"
-            util.np2img(rgb.astype(np.uint8), osp.join(nerf_dir, 'rgbs', fname))
-            # Depth is float32, convert to uint16 and use mm as unit (i.e., depth scale = 1000)
-            depth_uint16 = (depth * 1000).astype(np.uint16)
-            util.np2img(depth_uint16, osp.join(nerf_dir, 'depths', fname))
+        write_instant_ngp_dataset(nerf_cams, nerf_rgbs, nerf_depths, nerf_dir)
+        log_info(f"Wrote NeRF dataset to {nerf_dir}")
 
         pause_mc_thread(True)
         for pc in pcl:
