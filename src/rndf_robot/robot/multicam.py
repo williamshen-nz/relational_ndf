@@ -28,7 +28,10 @@ class MultiCams:
 
         self.cam_setup_cfg = {}
         self.cam_setup_cfg['focus_pt'] = [self.cfg.FOCUS_PT] * self.n_cams
-        self.cam_setup_cfg['dist'] = [self.cfg.DISTANCE] * self.n_cams
+        if 'DISTANCES' in self.cfg:
+            self.cam_setup_cfg['dist'] = self.cfg.DISTANCES[:self.n_cams]
+        else:
+            self.cam_setup_cfg['dist'] = [self.cfg.DISTANCE] * self.n_cams
         self.cam_setup_cfg['yaw'] = self.cfg.YAW_ANGLES[:self.n_cams]
         if 'PITCH_ANGLES' in self.cfg:
             self.cam_setup_cfg['pitch'] = self.cfg.PITCH_ANGLES[:self.n_cams]

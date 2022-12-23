@@ -764,14 +764,32 @@ def main(args):
         parent_pcd = pc_obs_info['pcd']['parent']
         child_pcd = pc_obs_info['pcd']['child']
 
+        # Take NeRF images of static scene
+        nerf_rgbs = []
+        nerf_depths = []
+        nerf_cam_start_time = time.perf_counter()
+        for i, cam in enumerate(nerf_cams.cams):
+            rgb, depth, seg = cam.get_images(get_rgb=True, get_depth=True, get_seg=True)
+            nerf_rgbs.append(rgb)
+            nerf_depths.append(depth)
+        log_info(f"Capturing NeRF cameras took: {time.perf_counter() - nerf_cam_start_time:.2f}s")
+
         log_info(f'[INTERSECTION], Loading model weights for multi NDF inference')
         parent_model.load_state_dict(torch.load(parent_model_path))
         child_model.load_state_dict(torch.load(child_model_path))
         pause_mc_thread(True)
+        opt_start_time = time.perf_counter()
         relative_trans = infer_relation_intersection(
             mc_vis, parent_optimizer, child_optimizer,
             parent_overall_target_desc, child_overall_target_desc,
             parent_pcd, child_pcd, parent_query_points, child_query_points, opt_visualize=args.opt_visualize)
+        opt_end_time = time.perf_counter()
+        metrics = {
+            "exp": args.exp,
+            "trial": iteration,
+            "infer_relation_intersection_time": opt_end_time - opt_start_time
+        }
+        log_info(f'[INTERSECTION], Inference took: {opt_end_time - opt_start_time:.2f}s')
         pause_mc_thread(False)
 
         time.sleep(1.0)
@@ -942,8 +960,30 @@ def main(args):
         results_txt_dict['success_criteria_dict'] = success_crit_dict
         open(results_txt_fname, 'w').write(str(results_txt_dict))
 
+        # Metrics that Will added
+        metrics["rndf_results"] = {
+            "place_success": place_success,
+            "success_criteria_dict": success_crit_dict,
+        }
+        metrics_fname = osp.join(eval_iter_dir, 'metrics.json')
+        with open(metrics_fname, 'w') as f:
+            json.dump(metrics, f, indent=2, default=str)
+
         eval_img_fname2 = osp.join(eval_iter_dir, f'{iteration}.png')
         util.np2img(eval_rgb.astype(np.uint8), eval_img_fname2)
+
+        # Write NeRF images
+        nerf_dir = osp.join(eval_iter_dir, 'nerf_dataset')
+        util.safe_makedirs(nerf_dir)
+        util.safe_makedirs(osp.join(nerf_dir, 'rgbs'))
+        util.safe_makedirs(osp.join(nerf_dir, 'depths'))
+
+        for i, (rgb, depth) in enumerate(zip(nerf_rgbs, nerf_depths)):
+            fname = f"{i:03d}.png"
+            util.np2img(rgb.astype(np.uint8), osp.join(nerf_dir, 'rgbs', fname))
+            # Depth is float32, convert to uint16 and use mm as unit (i.e., depth scale = 1000)
+            depth_uint16 = (depth * 1000).astype(np.uint16)
+            util.np2img(depth_uint16, osp.join(nerf_dir, 'depths', fname))
 
         pause_mc_thread(True)
         for pc in pcl:
