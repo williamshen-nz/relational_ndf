@@ -1056,7 +1056,8 @@ if __name__ == "__main__":
     parser.add_argument('--noise_idx', type=int, default=0)
 
     parser.add_argument("--skip_opt", action="store_true",
-                        help="If true, then skip the optimization and use identity for relative transformation")
+                        help="If true, then skip the R-NDF optimization. "
+                             "Used to generate NeRF datasets faster.")
 
     args = parser.parse_args()
 
