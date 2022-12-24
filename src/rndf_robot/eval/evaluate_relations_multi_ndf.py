@@ -780,10 +780,13 @@ def main(args):
         child_model.load_state_dict(torch.load(child_model_path))
         pause_mc_thread(True)
         opt_start_time = time.perf_counter()
-        relative_trans = infer_relation_intersection(
-            mc_vis, parent_optimizer, child_optimizer,
-            parent_overall_target_desc, child_overall_target_desc,
-            parent_pcd, child_pcd, parent_query_points, child_query_points, opt_visualize=args.opt_visualize)
+        if args.skip_opt:
+            relative_trans = np.eye(4)
+        else:
+            relative_trans = infer_relation_intersection(
+                mc_vis, parent_optimizer, child_optimizer,
+                parent_overall_target_desc, child_overall_target_desc,
+                parent_pcd, child_pcd, parent_query_points, child_query_points, opt_visualize=args.opt_visualize)
         opt_end_time = time.perf_counter()
         metrics = {
             "exp": args.exp,
@@ -1051,6 +1054,9 @@ if __name__ == "__main__":
 
     parser.add_argument('--add_noise', action='store_true')
     parser.add_argument('--noise_idx', type=int, default=0)
+
+    parser.add_argument("--skip_opt", action="store_true",
+                        help="If true, then skip the optimization and use identity for relative transformation")
 
     args = parser.parse_args()
 

@@ -154,10 +154,24 @@ def write_instant_ngp_dataset(
     )
     transforms["frames"] = metadata
 
-    # Normalize the poses.
+    # Write transforms_unnormalized.json
+    with open(osp.join(nerf_dir, "transforms_unnormalized.json"), "w") as fp:
+        json.dump(transforms, fp, indent=2)
+
+    # Normalize the pose
     translation, scale = find_transforms_center_and_scale(transforms)
     normalized_transforms = normalize_transforms(transforms, translation, scale)
 
-    # Write transforms.json
+    # Write transforms.json with normalized poses
     with open(osp.join(nerf_dir, "transforms.json"), "w") as fp:
         json.dump(normalized_transforms, fp, indent=2)
+
+    # Write normalization parameters
+    normalization_params = {
+        "translation": translation.tolist(),
+        "scale": scale,
+    }
+    with open(osp.join(nerf_dir, "normalization_params.json"), "w") as fp:
+        json.dump(normalization_params, fp, indent=2)
+
+    print(f"Wrote Instant-NGP dataset to {nerf_dir}")
