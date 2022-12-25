@@ -119,7 +119,7 @@ def write_instant_ngp_dataset(
 
         c2w = cam.get_cam_ext()
         # Convert to graphics convention - some funny stuff going on
-        # c2w = graphics_transformation @ c2w
+        c2w = graphics_transformation @ c2w
 
         # Convert to Instant-NGP convention
         c2w = convert_pose(c2w)
