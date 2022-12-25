@@ -9,6 +9,7 @@ import trimesh
 import meshcat, meshcat.geometry as mcg
 
 from airobot import log_info, log_warn, log_debug, log_critical
+from tqdm import tqdm
 
 from rndf_robot.utils import util, torch_util, trimesh_util, torch3d_util
 from rndf_robot.utils.plotly_save import plot3d
@@ -295,7 +296,7 @@ class OccNetOptimizer:
         for jj in range(M):
             pcd_traj_list[jj] = []
         viz_i = 0
-        for i in range(self.opt_iterations):
+        for i in tqdm(range(self.opt_iterations)):
             T_mat = torch_util.angle_axis_to_rotation_matrix(rot).squeeze()
             noise_val = (perturb_scale / ((i+1)**(perturb_decay)))
             noise_vec = (torch.randn(X.size()) * noise_val - noise_val/2).to(dev)

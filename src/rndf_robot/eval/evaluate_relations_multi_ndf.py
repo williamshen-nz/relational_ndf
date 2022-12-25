@@ -420,6 +420,8 @@ def main(args):
 
         parent_optimizer.setup_meshcat(mc_vis)
         child_optimizer.setup_meshcat(mc_vis)
+    else:
+        raise RuntimeError("Is this ever raised? Comment by willshen@")
 
     #########################################################################
     # Set up the relational energy model

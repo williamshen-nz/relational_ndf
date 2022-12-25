@@ -15,6 +15,7 @@ from rndf_robot.opt.optimizer import OccNetOptimizer
 def infer_relation_intersection(mc_vis, parent_optimizer, child_optimizer, parent_target_desc, child_target_desc, 
                                 parent_pcd, child_pcd, parent_query_points, child_query_points, opt_visualize=False, visualize=False,
                                 *args, **kwargs):
+    log_info("Optimizing parent descriptors")
     out_parent_feat = parent_optimizer.optimize_transform_implicit(parent_pcd, ee=True, return_score_list=True, return_final_desc=True, target_act_hat=parent_target_desc, visualize=opt_visualize)
     parent_feat_pose_mats, best_parent_idx, desc_dist_parent, desc_parent = out_parent_feat
 
@@ -23,6 +24,7 @@ def infer_relation_intersection(mc_vis, parent_optimizer, child_optimizer, paren
     child_optimizer.set_query_points(child_query_points)
 
     # now we want to do the same thing relative to the child objects
+    log_info("Optimizing child descriptors")
     out_child_feat = child_optimizer.optimize_transform_implicit(child_pcd, ee=False, return_score_list=True, return_final_desc=True, target_act_hat=child_target_desc, visualize=opt_visualize)
     child_feat_pose_mats, best_child_idx, desc_dist_child, desc_child = out_child_feat
 
@@ -174,7 +176,7 @@ def create_target_descriptors(parent_model, child_model, pc_demo_dict, target_de
     trans_list = []
     valid_targets = []
 
-    visualize_bounding_box_intersection = False  # can set to true for extra visualizations
+    visualize_bounding_box_intersection = True  # can set to true for extra visualizations
     n_demos = len(pc_demo_dict['parent']['demo_final_pcds']) if n_demos == 'all' else n_demos
     demo_idxs = np.random.permutation(len(pc_demo_dict['parent']['demo_final_pcds']))[:n_demos]
     for i in range(len(pc_demo_dict['parent']['demo_final_pcds'])):
