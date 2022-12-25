@@ -14,6 +14,7 @@ _C.CAMERA = get_default_cam_cfg()
 # 2 loops at different pitches and radii
 _C.CAMERA.YAW_ANGLES = np.linspace(0, 720, _C.N_CAMERAS).tolist()
 _C.CAMERA.PITCH_ANGLES = np.linspace(-15.0, -50.0, _C.N_CAMERAS).tolist()
+_C.CAMERA.DISTANCE = 0.8
 # _C.CAMERA.DISTANCES = np.linspace(0.9, 0.8, _C.N_CAMERAS).tolist()
 
 
