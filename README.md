@@ -23,9 +23,9 @@ There may be other hacks you will need to do to get this version of the codebase
 
 ### Table of Contents
 - [Setup and Installation](OG_README.md#setup) (note this links to the original README)
-- [NeRF Dataset Format](#NeRF Dataset Format)
-- [Unit Tests](#Unit Tests)
-- [General Tips](#General Tips)
+- [NeRF Dataset Format](#nerf-dataset-format)
+- [Unit Tests](#unit-tests)
+- [General Tips](#general-tips)
 - [Acknowledgements](#Acknowledgements)
 
 ___
