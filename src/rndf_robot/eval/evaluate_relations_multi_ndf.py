@@ -119,7 +119,17 @@ def main(args):
     mc_vis = meshcat.Visualizer(zmq_url=zmq_url)
     mc_vis['scene'].delete()
 
-    pb_client = create_pybullet_client(gui=args.pybullet_viz, opengl_render=True, realtime=True, server=args.pybullet_server)
+    pb_client = create_pybullet_client(
+        gui=args.pybullet_viz,
+        opengl_render=True,
+        realtime=True,
+        server=args.pybullet_server,
+        # Note: you can just modify this method in airobot in place for now
+        options=(
+            " ".join(f"--background_color_{channel}=1" for channel in ("red", "green", "blue"))
+            if args.pybullet_background_color == "white" else ""
+        )
+    )
     # Disable preview to make things faster
     enable = False
     p.configureDebugVisualizer(p.COV_ENABLE_GUI, enable, physicsClientId=pb_client.get_client_id())
@@ -453,8 +463,10 @@ def main(args):
     recorder.register_object(table_id, table_urdf_fname)
 
     # Add plane
-    plane_id = pb_client.load_urdf("plane.urdf")
-    # recorder.register_object(plane_id, osp.join(pybullet_data.getDataPath(), "plane.urdf"))
+    if args.plane_texture == "plane":
+        _ = pb_client.load_urdf("plane.urdf")
+        # This doesn't work
+        # recorder.register_object(plane_id, osp.join(pybullet_data.getDataPath(), "plane.urdf"))
 
     rec_stop_event = threading.Event()
     rec_run_event = threading.Event()
@@ -1084,6 +1096,9 @@ if __name__ == "__main__":
     parser.add_argument("--skip_opt", action="store_true",
                         help="If true, then skip the R-NDF optimization. "
                              "Used to generate NeRF datasets faster.")
+
+    parser.add_argument("--plane-texture", type=str, choices={"plane", "none"}, default="plane")
+    parser.add_argument("--pybullet_background_color", type=str, choices={"default", "white"}, default="default")
 
     args = parser.parse_args()
     validate_args(args)
