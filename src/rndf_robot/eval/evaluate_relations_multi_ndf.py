@@ -131,11 +131,12 @@ def main(args):
         )
     )
     # Disable preview to make things faster
-    enable = False
-    p.configureDebugVisualizer(p.COV_ENABLE_GUI, enable, physicsClientId=pb_client.get_client_id())
-    p.configureDebugVisualizer(p.COV_ENABLE_RGB_BUFFER_PREVIEW, enable, physicsClientId=pb_client.get_client_id())
-    p.configureDebugVisualizer(p.COV_ENABLE_DEPTH_BUFFER_PREVIEW, enable, physicsClientId=pb_client.get_client_id())
-    p.configureDebugVisualizer(p.COV_ENABLE_SEGMENTATION_MARK_PREVIEW, enable, physicsClientId=pb_client.get_client_id())
+    if not args.pybullet_debug_viz:
+        enable = False
+        p.configureDebugVisualizer(p.COV_ENABLE_GUI, enable, physicsClientId=pb_client.get_client_id())
+        p.configureDebugVisualizer(p.COV_ENABLE_RGB_BUFFER_PREVIEW, enable, physicsClientId=pb_client.get_client_id())
+        p.configureDebugVisualizer(p.COV_ENABLE_DEPTH_BUFFER_PREVIEW, enable, physicsClientId=pb_client.get_client_id())
+        p.configureDebugVisualizer(p.COV_ENABLE_SEGMENTATION_MARK_PREVIEW, enable, physicsClientId=pb_client.get_client_id())
 
     recorder = PyBulletMeshcat(pb_client=pb_client)
     recorder.clear()
@@ -1102,6 +1103,8 @@ if __name__ == "__main__":
 
     parser.add_argument("--plane-texture", type=str, choices={"plane", "none"}, default="plane")
     parser.add_argument("--pybullet_background_color", type=str, choices={"default", "white"}, default="default")
+    parser.add_argument("--pybullet_debug_viz", action="store_true",
+                        help="Enable debug visualization in PyBullet (makes things slower)")
     parser.add_argument("--disable_nerf_cams", action="store_true", help="Disable capturing NeRF dataset")
 
     args = parser.parse_args()
