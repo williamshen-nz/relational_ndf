@@ -46,7 +46,7 @@ Our main experimental metric is place success rate. The placement success check 
 
 ### Commands for running experiments on other categories (bowls, bottles) with our pretrained weights
 
-***Remember to download all the necessary object/demonstration/weight files! See the main [README](../README.md)***
+***Remember to download all the necessary object/demonstration/weight files! See the main [README](../OG_README.md)***
 
 Mug on rack:
 

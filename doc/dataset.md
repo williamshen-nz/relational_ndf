@@ -84,7 +84,7 @@ python generate_syn_containers.py \
 
 ## Notes on dataset and dataset generation
 ### Generating 3D point clouds and ground truth object poses
-Our dataset is primarily composed pairs of object point clouds and ground truth signed-distance values of a large number of points sampled in the volume near the shape. These are obtained by running the script at [`data_gen/shapenet_pcd_gen.py`](../src/rndf_robot/data_gen/shapenet_pcd_gen.py) for ShapeNet objects, or [`data_gen/syn_obj_pcd_gen.py`](../src/rndf_robot/data_gen/syn_obj_pcd_gen.py) for synthetic objects, after downloading the object models (see [main README](../README.md)).
+Our dataset is primarily composed pairs of object point clouds and ground truth signed-distance values of a large number of points sampled in the volume near the shape. These are obtained by running the script at [`data_gen/shapenet_pcd_gen.py`](../src/rndf_robot/data_gen/shapenet_pcd_gen.py) for ShapeNet objects, or [`data_gen/syn_obj_pcd_gen.py`](../src/rndf_robot/data_gen/syn_obj_pcd_gen.py) for synthetic objects, after downloading the object models (see [main README](../OG_README.md)).
 
 The scripts run by placing the object meshes in a PyBullet simulation and rendering depth images using simulated cameras at different poses. The objects are randomly scaled and posed to create more diversity in the dataset to help the point cloud encoder generalize. The points at which the occupancy is evaluated are similarly scaled/transformed based on how the object is adjusted when we load it into the simulator. 
 
