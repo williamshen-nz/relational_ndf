@@ -21,7 +21,8 @@ graphics_transformation = np.eye(4)
 graphics_transformation[:3, :3] = _robot_to_graphics_rotation
 
 
-def convert_pose(c2w):
+def convert_pose(c2w: np.ndarray) -> np.ndarray:
+    """Convert a pose from pybullet convention to OpenGL camera convention (I think)."""
     flip_yz = np.eye(4)
     flip_yz[1, 1] = -1
     flip_yz[2, 2] = -1
@@ -29,7 +30,7 @@ def convert_pose(c2w):
     return c2w
 
 
-def find_transforms_center_and_scale(raw_transforms):
+def find_transforms_center_and_scale(raw_transforms: dict) -> (np.ndarray, float):
     """Automatic rescale & offset the poses."""
     print("Computing center of attention...")
     frames = raw_transforms["frames"]
@@ -73,7 +74,12 @@ def find_transforms_center_and_scale(raw_transforms):
     return translation, scale
 
 
-def normalize_transforms(transforms, translation, scale):
+def normalize_transforms(
+    transforms: dict, translation: np.ndarray, scale: float
+) -> dict:
+    """
+    Normalize the transforms by subtracting the center of attention and scaling the scene to fit in a unit cube.
+    """
     normalized_transforms = copy.deepcopy(transforms)
     for f in normalized_transforms["frames"]:
         f["transform_matrix"] = np.asarray(f["transform_matrix"])
@@ -81,6 +87,21 @@ def normalize_transforms(transforms, translation, scale):
         f["transform_matrix"][0:3, 3] *= scale
         f["transform_matrix"] = f["transform_matrix"].tolist()
     return normalized_transforms
+
+
+def unnormalize_transforms(
+    transforms: dict, translation: np.ndarray, scale: float
+) -> dict:
+    """
+    Unnormalize the transforms.
+    """
+    unnormalized_transforms = copy.deepcopy(transforms)
+    for f in unnormalized_transforms["frames"]:
+        f["transform_matrix"] = np.asarray(f["transform_matrix"])
+        f["transform_matrix"][0:3, 3] /= scale
+        f["transform_matrix"][0:3, 3] += translation
+        f["transform_matrix"] = f["transform_matrix"].tolist()
+    return unnormalized_transforms
 
 
 def write_instant_ngp_dataset(

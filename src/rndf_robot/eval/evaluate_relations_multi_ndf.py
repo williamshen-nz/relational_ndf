@@ -799,11 +799,12 @@ def main(args):
         nerf_rgbs = []
         nerf_depths = []
         nerf_cam_start_time = time.perf_counter()
-        for i, cam in enumerate(nerf_cams.cams):
-            rgb, depth, seg = cam.get_images(get_rgb=True, get_depth=True, get_seg=True)
-            nerf_rgbs.append(rgb)
-            nerf_depths.append(depth)
-        log_info(f"Capturing NeRF cameras took: {time.perf_counter() - nerf_cam_start_time:.2f}s")
+        if not args.disable_nerf_cams:
+            for i, cam in enumerate(nerf_cams.cams):
+                rgb, depth, seg = cam.get_images(get_rgb=True, get_depth=True, get_seg=True)
+                nerf_rgbs.append(rgb)
+                nerf_depths.append(depth)
+            log_info(f"Capturing NeRF cameras took: {time.perf_counter() - nerf_cam_start_time:.2f}s")
 
         log_info(f'[INTERSECTION], Loading model weights for multi NDF inference')
         load_ndf_weights()
@@ -1006,10 +1007,11 @@ def main(args):
         util.np2img(eval_rgb.astype(np.uint8), eval_img_fname2)
 
         # Write NeRF images
-        nerf_dir = osp.join(eval_iter_dir, 'nerf_dataset')
-        util.safe_makedirs(nerf_dir)
-        write_instant_ngp_dataset(nerf_cams, nerf_rgbs, nerf_depths, nerf_dir)
-        log_info(f"Wrote NeRF dataset to {nerf_dir}")
+        if not args.disable_nerf_cams:
+            nerf_dir = osp.join(eval_iter_dir, 'nerf_dataset')
+            util.safe_makedirs(nerf_dir)
+            write_instant_ngp_dataset(nerf_cams, nerf_rgbs, nerf_depths, nerf_dir)
+            log_info(f"Wrote NeRF dataset to {nerf_dir}")
 
         pause_mc_thread(True)
         for pc in pcl:
@@ -1093,12 +1095,14 @@ if __name__ == "__main__":
     parser.add_argument('--add_noise', action='store_true')
     parser.add_argument('--noise_idx', type=int, default=0)
 
+    # New args added by willshen
     parser.add_argument("--skip_opt", action="store_true",
                         help="If true, then skip the R-NDF optimization. "
                              "Used to generate NeRF datasets faster.")
 
     parser.add_argument("--plane-texture", type=str, choices={"plane", "none"}, default="plane")
     parser.add_argument("--pybullet_background_color", type=str, choices={"default", "white"}, default="default")
+    parser.add_argument("--disable_nerf_cams", action="store_true", help="Disable capturing NeRF dataset")
 
     args = parser.parse_args()
     validate_args(args)
