@@ -1,6 +1,8 @@
 import os, os.path as osp
 import sys
 import random
+from itertools import cycle
+
 import numpy as np
 import time
 import signal
@@ -489,15 +491,21 @@ def main(args):
     # start experiment: sample parent and child object on each iteration and infer the relation
     place_success_list = []
 
+    demo_indices_cycle = cycle(range(len(demos)))
+
     for iteration in range(args.start_iteration, args.num_iterations):
         #####################################################################################
         # set up the trial
 
-        demo_idx = np.random.randint(len(demos))
-        demo = demos[demo_idx]
+        # Cycle through the demos instead of just randomly sampling
+        # demo_idx = np.random.randint(len(demos))
+        demo_idx = next(demo_indices_cycle)
+        # willshen@ comment, unused variable so commented out
+        # demo = demos[demo_idx]
         if args.test_on_train:
             parent_id = pc_master_dict['parent']['demo_ids'][demo_idx]
             child_id = pc_master_dict['child']['demo_ids'][demo_idx]
+            log_info(f"Using demo {demo_idx} for parent and child objects")
         else:
             parent_id = random.sample(pc_master_dict['parent']['test_ids'], 1)[0]
             child_id = random.sample(pc_master_dict['child']['test_ids'], 1)[0]
@@ -1000,6 +1008,15 @@ def main(args):
         pause_mc_thread(False)
 
 
+def validate_args(args):
+    """ Additional checks Will Shen added to make life easier. """
+    if args.test_on_train:
+        assert args.parent_load_pose_type == "demo_pose", \
+            "Must use demo poses for parent when test on train enabled"
+        assert args.child_load_pose_type == "demo_pose", \
+            "Must use demo poses for child when test on train enabled"
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--debug', action='store_true')
@@ -1067,5 +1084,5 @@ if __name__ == "__main__":
                              "Used to generate NeRF datasets faster.")
 
     args = parser.parse_args()
-
+    validate_args(args)
     main(args)
