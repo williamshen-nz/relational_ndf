@@ -162,11 +162,18 @@ def main(args):
     else:
         child_model_path_ebm = child_model_path
 
-    parent_model = vnn_occupancy_network.VNNOccNet(latent_dim=256, model_type='pointnet', return_features=True, sigmoid=True).cuda()
-    child_model = vnn_occupancy_network.VNNOccNet(latent_dim=256, model_type='pointnet', return_features=True, sigmoid=True).cuda()
+    parent_model = vnn_occupancy_network.VNNOccNet(latent_dim=256, model_type='pointnet', return_features=True, sigmoid=True)
+    child_model = vnn_occupancy_network.VNNOccNet(latent_dim=256, model_type='pointnet', return_features=True, sigmoid=True)
 
-    parent_model.load_state_dict(torch.load(parent_model_path))
-    child_model.load_state_dict(torch.load(child_model_path))
+    def load_ndf_weights():
+        map_device = torch.device('cpu')
+        if torch.cuda.is_available():
+            parent_model.cuda()
+            child_model.cuda()
+            map_device = torch.device('cuda')
+
+        parent_model.load_state_dict(torch.load(parent_model_path, map_location=map_device))
+        child_model.load_state_dict(torch.load(child_model_path, map_location=map_device))
 
     cams = MultiCams(cfg.CAMERA, pb_client, n_cams=cfg.N_CAMERAS)
     cam_info = {}
@@ -328,9 +335,7 @@ def main(args):
 
     pc_master_dict['parent']['model'] = parent_model
     pc_master_dict['child']['model'] = child_model
-
-    parent_model.load_state_dict(torch.load(parent_model_path))
-    child_model.load_state_dict(torch.load(child_model_path))
+    load_ndf_weights()
 
     # put the data in our pc master
     pc_master_dict['parent']['demo_start_pcds'] = []
@@ -386,8 +391,11 @@ def main(args):
         target_descriptors_data = np.load(target_desc_fname)
         parent_overall_target_desc = target_descriptors_data['parent_overall_target_desc']
         child_overall_target_desc = target_descriptors_data['child_overall_target_desc']
-        parent_overall_target_desc = torch.from_numpy(parent_overall_target_desc).float().cuda()
-        child_overall_target_desc = torch.from_numpy(child_overall_target_desc).float().cuda()
+        parent_overall_target_desc = torch.from_numpy(parent_overall_target_desc).float()
+        child_overall_target_desc = torch.from_numpy(child_overall_target_desc).float()
+        if torch.cuda.is_available():
+            parent_overall_target_desc = parent_overall_target_desc.cuda()
+            child_overall_target_desc = child_overall_target_desc.cuda()
         parent_query_points = target_descriptors_data['parent_query_points']
         child_query_points = copy.deepcopy(parent_query_points)
 
@@ -436,7 +444,7 @@ def main(args):
     # table_texture_path = osp.join(path_util.get_rndf_descriptions(), 'hanging/table_w_material/table.png')
     table_texture_path = osp.join(get_rndf_assets(), "table.png")
     texture_modder = TextureModder(pb_client.get_client_id())
-    texture_modder.set_texture_path(osp.join(get_rndf_assets(), "dtd-r1.0.1/dtd/images"))
+    texture_modder.set_texture_path(osp.join(get_rndf_assets(), "dtd/images"))
     texture_modder.set_texture(table_id, 0, table_texture_path)
     recorder.register_object(table_id, table_urdf_fname)
 
@@ -776,8 +784,7 @@ def main(args):
         log_info(f"Capturing NeRF cameras took: {time.perf_counter() - nerf_cam_start_time:.2f}s")
 
         log_info(f'[INTERSECTION], Loading model weights for multi NDF inference')
-        parent_model.load_state_dict(torch.load(parent_model_path))
-        child_model.load_state_dict(torch.load(child_model_path))
+        load_ndf_weights()
         pause_mc_thread(True)
         opt_start_time = time.perf_counter()
         if args.skip_opt:

@@ -1,4 +1,5 @@
 src/rndf_robot/assets/dtd-r1.0.1/
+src/rndf_robot/assets/dtd/
 src/rndf_robot/descriptions/objects/
 src/rndf_robot/eval/debug_viz/
 src/rndf_robot/eval/visualization/
@@ -8,6 +9,7 @@ src/rndf_robot/model_weights/
 src/rndf_robot/unused/
 run*.sh
 run*.bash
+dtd-r1.0.1.tar.gz
 
 *val_viz*
 run*.sh
