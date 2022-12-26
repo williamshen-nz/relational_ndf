@@ -7,6 +7,7 @@ src/rndf_robot/eval_data/
 src/rndf_robot/descriptions/demo_objects/
 src/rndf_robot/model_weights/
 src/rndf_robot/unused/
+src/rndf_robot/nerf_datasets/
 run*.sh
 run*.bash
 dtd-r1.0.1.tar.gz

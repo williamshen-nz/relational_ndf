@@ -45,6 +45,10 @@ def get_rndf_model_weights():
     return osp.join(get_rndf_src(), 'model_weights')
 
 
+def get_rndf_nerf_datasets() -> str:
+    return osp.join(get_rndf_src(), 'nerf_datasets')
+
+
 def get_conv_onet_src():
     assert 'CONV_ONET_SOURCE_DIR' in os.environ.keys(), 'CONV_ONET_SOURCE_DIR not found in environment variables'
     return os.environ['CONV_ONET_SOURCE_DIR']

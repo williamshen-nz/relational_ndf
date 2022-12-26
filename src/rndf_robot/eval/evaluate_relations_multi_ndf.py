@@ -2,6 +2,7 @@ import os, os.path as osp
 import sys
 import random
 from itertools import cycle
+from loguru import logger
 
 import numpy as np
 import time
@@ -25,6 +26,7 @@ from matplotlib import pyplot as plt
 
 import rndf_robot.model.vnn_occupancy_net_pointnet_dgcnn as vnn_occupancy_network
 from rndf_robot.config.default_nerf_cfg import get_nerf_cfg
+from rndf_robot.nerf.copy_datasets import copy_nerf_datasets
 from rndf_robot.nerf.dataset import write_instant_ngp_dataset
 from rndf_robot.utils import util, path_util
 
@@ -76,6 +78,9 @@ def main(args):
         set_log_level('debug')
     else:
         set_log_level('info')
+        # By default, loguru log level is DEBUG so let's set it to INFO
+        logger.remove()
+        logger.add(sys.stderr, level="INFO")
 
     signal.signal(signal.SIGINT, util.signal_handler)
 
@@ -812,6 +817,7 @@ def main(args):
         pause_mc_thread(True)
         opt_start_time = time.perf_counter()
         if args.skip_opt:
+            # Just keep the current pose if skipping optimization
             relative_trans = np.eye(4)
         else:
             relative_trans = infer_relation_intersection(
@@ -1024,6 +1030,19 @@ def main(args):
         mc_vis['scene/final_child_pcd'].delete()
         pause_mc_thread(False)
 
+    #########################################################################
+    # Completed all trials, let's copy the NeRF datasets to their own directory
+    # Just use the experiment name provided in the args so we don't make things
+    # too complicated.
+    if args.disable_nerf_cams or args.disable_nerf_dataset_copy:
+        logger.info("Skipping NeRF dataset copy.")
+        return
+
+    nerf_dataset_dir = osp.join(path_util.get_rndf_nerf_datasets(), args.exp)
+    os.makedirs(nerf_dataset_dir, exist_ok=True)
+    copy_nerf_datasets(eval_dir=eval_save_dir, target_dir=nerf_dataset_dir)
+    log_info(f"NeRF datasets copied to {nerf_dataset_dir}")
+
 
 def validate_args(args):
     """ Additional checks Will Shen added to make life easier. """
@@ -1106,6 +1125,8 @@ if __name__ == "__main__":
     parser.add_argument("--pybullet_debug_viz", action="store_true",
                         help="Enable debug visualization in PyBullet (makes things slower)")
     parser.add_argument("--disable_nerf_cams", action="store_true", help="Disable capturing NeRF dataset")
+    parser.add_argument("--disable_nerf_dataset_copy", action="store_true",
+                        help="Disable copying NeRF dataset to the dedicated rndf_robot/nerf_datasets folder")
 
     args = parser.parse_args()
     validate_args(args)
