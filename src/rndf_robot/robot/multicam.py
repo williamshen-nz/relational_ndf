@@ -23,6 +23,10 @@ class MultiCams:
         self.cfg = cam_cfg
         self.pb_client = pb_client
         self.focus_pt = self.cfg.FOCUS_PT
+        # Support custom width and height
+        self.width = self.cfg.get('WIDTH', 640)
+        self.height = self.cfg.get('HEIGHT', 480)
+
         for _ in range(n_cams):
             self.cams.append(RGBDCameraPybullet(cfgs=self._camera_cfgs(),
                                                 pb_client=pb_client))
@@ -52,8 +56,8 @@ class MultiCams:
         _C = CN()
         _C.ZNEAR = 0.01
         _C.ZFAR = 10
-        _C.WIDTH = 640
-        _C.HEIGHT = 480
+        _C.WIDTH = self.width
+        _C.HEIGHT = self.height
         _C.FOV = 60
         _ROOT_C = CN()
         _ROOT_C.CAM = CN()
@@ -72,18 +76,6 @@ class MultiCams:
                 pitch=self.cam_setup_cfg['pitch'][i],
                 roll=self.cam_setup_cfg['roll'][i]
             )
-
-    @property
-    def width(self) -> float:
-        widths = [cam.img_width for cam in self.cams]
-        assert len(set(widths)) == 1, 'All cameras must have the same width'
-        return widths[0]
-
-    @property
-    def height(self) -> float:
-        heights = [cam.img_height for cam in self.cams]
-        assert len(set(heights)) == 1, 'All cameras must have the same height'
-        return heights[0]
 
     @property
     def intrinsic_matrix(self) -> np.ndarray:
