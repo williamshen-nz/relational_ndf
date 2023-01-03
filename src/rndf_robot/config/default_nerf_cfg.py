@@ -13,8 +13,8 @@ _C.CAMERA = get_default_cam_cfg()
 
 # The Evo-NeRF paper has some info about potentially good trajectories
 # https://openreview.net/pdf?id=Bxr45keYrf#page=12
-_C.CAMERA.WIDTH = 1280
-_C.CAMERA.HEIGHT = 720
+_C.CAMERA.WIDTH = 640
+_C.CAMERA.HEIGHT = 480
 
 # 2 loops at different pitches and radii
 _C.CAMERA.YAW_ANGLES = np.linspace(0, 720, _C.N_CAMERAS).tolist()

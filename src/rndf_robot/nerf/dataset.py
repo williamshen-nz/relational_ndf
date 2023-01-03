@@ -68,8 +68,9 @@ def find_transforms_center_and_scale(raw_transforms: dict) -> (np.ndarray, float
     avglen /= nframes
     print("avg camera distance from origin", avglen)
     # Will Shen comment: don't want to scale it too much, avglen ensures unit cube covers the scene
+    # dividing by 1.5 qualitatively looks good in nerfstudio.
     # scale = 4.0 / avglen  # scale to "nerf sized"
-    scale = avglen
+    scale = avglen / 1.5
 
     return translation, scale
 
