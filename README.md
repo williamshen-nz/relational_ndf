@@ -18,7 +18,7 @@ There may be other hacks you will need to do to get this version of the codebase
 <p align="center">
     <img src="doc/nerf_pcd.png" width="500">
     <br>
-    <i>Point Cloud from a NeRF of a scene in R-NDF.</i>
+    <i>Point Cloud from a NeRF of a scene in R-NDF for "mug on rack".</i>
 </p>
 
 ### Table of Contents
