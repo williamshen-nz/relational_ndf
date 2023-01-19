@@ -1,3 +1,4 @@
+import colorsys
 import os, os.path as osp
 import sys
 import random
@@ -42,6 +43,16 @@ from rndf_robot.eval.relation_tools.multi_ndf import infer_relation_intersection
 
 
 NOISE_VALUE_LIST = [0.01, 0.02, 0.03, 0.04, 0.06, 0.08, 0.16, 0.24, 0.32, 0.4]
+
+
+def random_color() -> (float, float, float):
+    """
+    Generate a random color. Use HSV so that the colors are evenly distributed.
+    Returns a tuple of 3 floats in the range [0, 1]
+    """
+    h, s, v = [random.random() for i in range(3)]
+    r, g, b = colorsys.hsv_to_rgb(h, s, v)
+    return r, g, b
 
 
 def pb2mc_update(recorder, mc_vis, stop_event, run_event):
@@ -130,10 +141,10 @@ def main(args):
         realtime=True,
         server=args.pybullet_server,
         # Note: you can just modify this method in airobot in place for now
-        options=(
-            " ".join(f"--background_color_{channel}=1" for channel in ("red", "green", "blue"))
-            if args.pybullet_background_color == "white" else ""
-        )
+        # options=(
+        #     " ".join(f"--background_color_{channel}=1" for channel in ("red", "green", "blue"))
+        #     if args.pybullet_background_color == "white" else ""
+        # )
     )
     # Disable preview to make things faster
     if not args.pybullet_debug_viz:
@@ -451,26 +462,20 @@ def main(args):
 
     #####################################################################################
     # prepare the simuation environment
+    table_urdf_fname = osp.join(path_util.get_rndf_descriptions(), 'hanging/table/table.urdf')
+    table_pos = [0.5, 0.0, 0.375]
+    log_warn(f"Warning cfg.TABLE_POS is not being used and is hardcoded to {table_pos}")
+    table_id = pb_client.load_urdf(table_urdf_fname, table_pos, cfg.TABLE_ORI, scaling=1.0)
+    # recorder.register_object(table_id, table_urdf_fname)
 
-    table_urdf_fname = osp.join(path_util.get_rndf_descriptions(), 'hanging/table/table_manual.urdf')
-    # table_urdf_fname = osp.join(path_util.get_rndf_descriptions(), 'hanging/table/table_rack_manual.urdf')
-    # table_urdf_fname = osp.join(path_util.get_rndf_descriptions(), 'hanging/table/table_rack.urdf')
-    table_id = pb_client.load_urdf(table_urdf_fname,
-                            cfg.TABLE_POS,
-                            cfg.TABLE_ORI,
-                            scaling=1.0)
-
-    # Apply texture to table
-    # table_texture_path = osp.join(path_util.get_rndf_descriptions(), 'hanging/table_w_material/table.png')
-    table_texture_path = osp.join(get_rndf_assets(), "table.png")
+    # Create texture modder for later use
     texture_modder = TextureModder(pb_client.get_client_id())
-    texture_modder.set_texture_path(osp.join(get_rndf_assets(), "dtd/images"))
-    texture_modder.set_texture(table_id, 0, table_texture_path)
-    recorder.register_object(table_id, table_urdf_fname)
+    # texture_modder.set_texture_path(osp.join(get_rndf_assets(), "dtd/images"))
 
     # Add plane
     if args.plane_texture == "plane":
-        _ = pb_client.load_urdf("plane.urdf")
+        # We set the height of the plane to 0.7 so it's closer to the table
+        _ = pb_client.load_urdf("plane.urdf", [0, 0, 0.7])
         # This doesn't work
         # recorder.register_object(plane_id, osp.join(pybullet_data.getDataPath(), "plane.urdf"))
 
@@ -727,8 +732,8 @@ def main(args):
                 base_ori=ori)
 
             # change the texture
-            texture_modder.rand_texture(obj_id, -1)
-            # texture_modder.rand_rgb(obj_id, -1)
+            random_rgba = [*random_color(), 1.0]
+            texture_modder.set_rgba(obj_id, -1, random_rgba)
 
             # register the object with the meshcat visualizer
             recorder.register_object(obj_id, obj_obj_file_dec, scaling=mesh_scale)
