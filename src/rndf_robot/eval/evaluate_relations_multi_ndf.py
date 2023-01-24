@@ -1023,6 +1023,25 @@ def main(args):
             nerf_dir = osp.join(eval_iter_dir, 'nerf_dataset')
             util.safe_makedirs(nerf_dir)
             write_instant_ngp_dataset(nerf_cams, nerf_rgbs, nerf_depths, nerf_dir)
+
+            demo_metadata = {
+                "demo_path": demo_path,
+                "demo_file": demo_files[demo_idx],
+                "multi_obj_names": demos[demo_idx]["multi_obj_names"].item(),
+            }
+
+            metadata = {
+                "demo": demo_metadata if args.test_on_train else None,
+                "parent_id": parent_id,
+                "child_id": child_id,
+                "is_parent_shapenet_obj": is_parent_shapenet_obj,
+                "is_child_shapenet_obj": is_child_shapenet_obj,
+                "mesh_file": obj_obj_file,
+            }
+            metadata_fname = osp.join(nerf_dir, 'rndf_metadata.json')
+            with open(metadata_fname, 'w') as f:
+                json.dump(metadata, f, indent=2, default=str)
+
             log_info(f"Wrote NeRF dataset to {nerf_dir}")
 
         pause_mc_thread(True)

@@ -1,6 +1,8 @@
 import os, os.path as osp
 import sys
 import random
+from typing import Dict
+
 import numpy as np
 import torch
 import copy
@@ -132,7 +134,8 @@ def create_target_descriptors(parent_model, child_model, pc_demo_dict, target_de
     if osp.exists(target_desc_fname):
         import datetime
         import shutil
-        nowstr = datetime.datetime.now().strftime("%m-%d-%Y_%H-%M-%S")
+        # Use yyyy-mm-dd_hh-mm-ss format
+        nowstr = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         # save a copy of the current target desc before we overwrite it
         backup_desc_folder = '/'.join(target_desc_fname.split('/')[:-1])
         backup_desc_folder = osp.join(backup_desc_folder, nowstr) 
@@ -145,7 +148,8 @@ def create_target_descriptors(parent_model, child_model, pc_demo_dict, target_de
         assert osp.exists(backup_desc_fname), f'Something went wrong with backing up the descriptors to path: {backup_desc_fname}!'
 
     # initialize set of world frame query points with specified variance
-    parent_query_points = np.random.normal(scale=query_scale, size=(500, 3))
+    num_query_points = 500
+    parent_query_points = np.random.normal(scale=query_scale, size=(num_query_points, 3))
     child_query_points = copy.deepcopy(parent_query_points)
 
     # create optimizers that will be used for alignment
@@ -309,6 +313,12 @@ def create_target_descriptors(parent_model, child_model, pc_demo_dict, target_de
     parent_descriptor_variance_list = []
     child_descriptor_variance_list = []
 
+    # Additional data for the parent or child in each demo, store the latest align round data here
+    parent_out_data: Dict[int, Dict] = {}
+    child_out_data: Dict[int, Dict] = {}
+    # Only support 1 valid target because it seems like that is what the code is doing
+    assert len(valid_targets) == 1, "willshen@ comment: only one target is supported for now"
+
     # loop through all as the targets
     for target_idx in valid_targets:
         # target_idx = valid_targets[-2]
@@ -374,9 +384,12 @@ def create_target_descriptors(parent_model, child_model, pc_demo_dict, target_de
             break
 
         for it in range(alignment_rounds):
-            
+            print(f"Alignment round {it + 1}/{alignment_rounds}")
             for idx in demo_idxs:
-                print(f'\n\nAligning demo number: {idx} to target demo number: {target_idx}\n\n')
+                print(
+                    f'\n\nAligning demo number: {idx} to target demo number: {target_idx}, '
+                    f'alignment round {it + 1}/{alignment_rounds}\n\n'
+                )
                 parent_pcd = pc_demo_dict['parent']['demo_final_pcds'][idx]
                 child_pcd = pc_demo_dict['child']['demo_final_pcds'][idx]
 
@@ -402,6 +415,12 @@ def create_target_descriptors(parent_model, child_model, pc_demo_dict, target_de
 
                         parent_out_tf_best = parent_out_tf[parent_out_best_idx]
                         parent_out_qp = util.transform_pcd(parent_query_points, parent_out_tf_best)
+                        # Store latest alignment round data
+                        parent_out_data[idx] = {
+                            "parent_out_tf_best": parent_out_tf_best,
+                            "parent_out_qp": parent_out_qp,
+                            "alignment_round": it,
+                        }
 
                         child_out_desc = child_optimizer.get_pose_descriptor(child_pcd, parent_out_tf_best).detach()
                         child_last_outdesc[idx] = child_out_desc
@@ -422,6 +441,12 @@ def create_target_descriptors(parent_model, child_model, pc_demo_dict, target_de
 
                         child_out_tf_best = child_out_tf[child_out_best_idx]
                         child_out_qp = util.transform_pcd(child_query_points, child_out_tf_best)
+                        # Store latest alignment round data
+                        child_out_data[idx] = {
+                            "child_out_tf_best": child_out_tf_best,
+                            "child_out_qp": child_out_qp,
+                            "alignment_round": it,
+                        }
 
                         parent_out_desc = parent_optimizer.get_pose_descriptor(parent_pcd, child_out_tf_best).detach()
                         parent_last_outdesc[idx] = parent_out_desc
@@ -458,6 +483,31 @@ def create_target_descriptors(parent_model, child_model, pc_demo_dict, target_de
     parent_descriptor_variance = np.asarray(parent_descriptor_variance_list)
     child_descriptor_variance = np.asarray(child_descriptor_variance_list)
 
+    # Run some asserts to make sure the additional data we write out is correct
+    # 1. Either parent or child should have output data
+    assert parent_out_data or child_out_data, "Both parent and child out data are empty dicts"
+    assert not (parent_out_data and child_out_data), "Either parent or child out data should be empty dict"
+    out_data, out_label = (parent_out_data, "parent") if parent_out_data else (child_out_data, "child")
+    # 2. For each demo, check that the output data is correct
+    for demo_idx in demo_idxs:
+        assert demo_idx in out_data, f"Demo {demo_idx} not in {out_label} out data"
+        data = out_data[demo_idx]
+
+        # Alignment round is round at which the best alignment was found
+        assert 1 <= data["alignment_round"] <= alignment_rounds - 1, (
+            f"Alignment round {data['alignment_round']} out of range for demo {demo_idx}"
+        )
+        # Check output transform and query points have right shape
+        assert data[f"{out_label}_out_tf_best"].shape == (4, 4), "Best alignment transform is not 4x4"
+        assert data[f"{out_label}_out_qp"].shape == (num_query_points, 3), "Best alignment query points are not 3D"
+
+    # Get a label for each demo, `demo_idxs` is shuffled but all the indices are still consistent
+    demo_ids = list(zip(
+        pc_demo_dict["parent"]["demo_ids"],
+        pc_demo_dict["child"]["demo_ids"],
+        list(range(len(demo_idxs)))
+    ))
+
     print(f'Done! Saving to {target_desc_fname}')
     np.savez(
         target_desc_fname,
@@ -468,5 +518,10 @@ def create_target_descriptors(parent_model, child_model, pc_demo_dict, target_de
         child_descriptor_variance=child_descriptor_variance,
         add_noise=add_noise,
         interaction_pt_noise_std=interaction_pt_noise_std,
-        interaction_pt_noise_value=interaction_noise
+        interaction_pt_noise_value=interaction_noise,
+        # Additional things willshen@ added
+        num_query_points=num_query_points,
+        parent_out_data=parent_out_data,
+        child_out_data=child_out_data,
+        demo_ids=demo_ids,
     )
