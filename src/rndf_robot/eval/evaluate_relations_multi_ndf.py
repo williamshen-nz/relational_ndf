@@ -23,7 +23,6 @@ from airobot import log_info, log_warn, log_debug, log_critical, set_log_level
 from airobot.utils import common
 from airobot.utils.pb_util import create_pybullet_client, TextureModder
 from airobot.sensor.camera.rgbdcam_pybullet import RGBDCameraPybullet
-from matplotlib import pyplot as plt
 
 import rndf_robot.model.vnn_occupancy_net_pointnet_dgcnn as vnn_occupancy_network
 from rndf_robot.config.default_nerf_cfg import get_nerf_cfg
@@ -36,7 +35,6 @@ from rndf_robot.opt.optimizer import OccNetOptimizer
 from rndf_robot.robot.multicam import MultiCams
 from rndf_robot.config.default_eval_cfg import get_eval_cfg_defaults
 from rndf_robot.share.globals import bad_shapenet_mug_ids_list, bad_shapenet_bowls_ids_list, bad_shapenet_bottles_ids_list
-from rndf_robot.utils.path_util import get_rndf_assets
 from rndf_robot.utils.pb2mc.pybullet_meshcat import PyBulletMeshcat
 from rndf_robot.utils.eval_gen_utils import constraint_obj_world, safeCollisionFilterPair, safeRemoveConstraint
 
