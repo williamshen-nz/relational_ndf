@@ -45,16 +45,21 @@ def copy_nerf_datasets(eval_dir: str, target_dir: str) -> None:
         og_dataset_path_to_new_path[nerf_dataset_path] = trial_name
         num_datasets += 1
 
-    # Find the full_exp_cfg.txt and copy it to the target_dir
-    for full_exp_cfg_path in glob.glob(
-        eval_dir + "/**/full_exp_cfg.txt", recursive=True
-    ):
-        # The txt file is actually a JSON file, so let's make change the
-        # extension when copying.
-        target_cfg_path = os.path.join(target_dir, "full_exp_cfg.json")
-        shutil.copyfile(full_exp_cfg_path, target_cfg_path)
-        logger.debug(f"Copied {full_exp_cfg_path} to {target_dir}")
-        break
+    # Find full_exp_cfg.txt and target_descriptors.npz and copy it to the target_dir
+    for filename, new_extension in [
+        ("full_exp_cfg.txt", "json"),
+        ("target_descriptors.npz", None),
+    ]:
+        matching_paths = glob.glob(eval_dir + f"/**/{filename}", recursive=True)
+        assert len(matching_paths) == 1, f"Found {len(matching_paths)} {filename} files"
+        path = matching_paths[0]
+        # Replace extension if necessary
+        target_path = os.path.join(target_dir, filename)
+        if new_extension is not None:
+            target_path = f"{os.path.splitext(target_path)[0]}.{new_extension}"
+        # Copy file to target_path
+        shutil.copy(path, target_path)
+        logger.debug(f"Copied {path} to {target_path}")
 
     # Write a debug JSON file
     debug = {
@@ -62,7 +67,7 @@ def copy_nerf_datasets(eval_dir: str, target_dir: str) -> None:
         "og_dataset_path_to_new_path": og_dataset_path_to_new_path,
         "timestamp": str(datetime.now()),
     }
-    with open(os.path.join(target_dir, "debug.json"), "w") as f:
+    with open(os.path.join(target_dir, "rndf_debug.json"), "w") as f:
         json.dump(debug, f, indent=2)
 
     logger.success(
