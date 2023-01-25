@@ -521,6 +521,15 @@ def main(args):
 
     demo_indices_cycle = cycle(range(len(demos)))
 
+    if args.test_on_train:
+        assert args.start_iteration == 0, "If testing on train, start iteration must be 0"
+        og_num_iterations = args.num_iterations
+        args.num_iterations = len(demos)
+        log_warn(
+            f"Testing on train, overriding num_iterations to {args.num_iterations} = len(demos) "
+            f"from {og_num_iterations}"
+        )
+
     for iteration in range(args.start_iteration, args.num_iterations):
         #####################################################################################
         # set up the trial
@@ -1032,6 +1041,8 @@ def main(args):
                 "is_parent_shapenet_obj": is_parent_shapenet_obj,
                 "is_child_shapenet_obj": is_child_shapenet_obj,
                 "mesh_file": obj_obj_file,
+                "test_on_train": args.test_on_train,
+                "generate_dataset_only": args.generate_dataset_only,
             }
             metadata_fname = osp.join(nerf_dir, 'rndf_metadata.json')
             with open(metadata_fname, 'w') as f:
