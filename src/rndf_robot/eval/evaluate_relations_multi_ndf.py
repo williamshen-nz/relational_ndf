@@ -29,6 +29,7 @@ import rndf_robot.model.vnn_occupancy_net_pointnet_dgcnn as vnn_occupancy_networ
 from rndf_robot.config.default_nerf_cfg import get_nerf_cfg
 from rndf_robot.nerf.copy_datasets import copy_nerf_datasets
 from rndf_robot.nerf.dataset import write_instant_ngp_dataset
+from rndf_robot.nerf.upload_datasets import upload_datasets_to_logger
 from rndf_robot.utils import util, path_util
 
 from rndf_robot.opt.optimizer import OccNetOptimizer
@@ -153,6 +154,8 @@ def main(args):
         p.configureDebugVisualizer(p.COV_ENABLE_RGB_BUFFER_PREVIEW, enable, physicsClientId=pb_client.get_client_id())
         p.configureDebugVisualizer(p.COV_ENABLE_DEPTH_BUFFER_PREVIEW, enable, physicsClientId=pb_client.get_client_id())
         p.configureDebugVisualizer(p.COV_ENABLE_SEGMENTATION_MARK_PREVIEW, enable, physicsClientId=pb_client.get_client_id())
+        # Disable shadows
+        p.configureDebugVisualizer(p.COV_ENABLE_SHADOWS, 0, physicsClientId=pb_client.get_client_id())
 
     recorder = PyBulletMeshcat(pb_client=pb_client)
     recorder.clear()
@@ -1066,6 +1069,8 @@ def main(args):
     os.makedirs(nerf_dataset_dir, exist_ok=True)
     copy_nerf_datasets(eval_dir=eval_save_dir, target_dir=nerf_dataset_dir)
     log_info(f"NeRF datasets copied to {nerf_dataset_dir}")
+    upload_datasets_to_logger(nerf_dataset_dir, exp_name=f"{args.exp}/{args.logger_suffix}")
+    log_info(f"NeRF datasets uploaded to ML-Logger")
 
 
 def validate_args(args):
@@ -1140,6 +1145,8 @@ if __name__ == "__main__":
     parser.add_argument('--noise_idx', type=int, default=0)
 
     # New args added by willshen
+    parser.add_argument("--logger_suffix", type=str, default="debug",
+                        help="Suffix to add to the logger prefix which is just the args.exp")
     parser.add_argument("--skip_opt", action="store_true",
                         help="If true, then skip the R-NDF optimization. "
                              "Used to generate NeRF datasets faster.")
