@@ -19,7 +19,7 @@ def upload_datasets_to_logger(nerf_dataset_dir: str, exp_name: str) -> str:
 
     with logger.Sync():
         # Upload directory as a tarball then extract it
-        tar_fname = f"{exp_name}.tar"
+        tar_fname = "dataset.tar"
         logger.upload_dir(nerf_dataset_dir, tar_fname, archive="tar")
         logger.print(f"Uploaded NeRF dataset to {tar_fname}")
 

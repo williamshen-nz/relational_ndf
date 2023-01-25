@@ -46,12 +46,20 @@ def copy_nerf_datasets(eval_dir: str, target_dir: str) -> None:
         num_datasets += 1
 
     # Find full_exp_cfg.txt and target_descriptors.npz and copy it to the target_dir
-    for filename in ("full_exp_cfg.txt", "target_descriptors.npz"):
+    for filename, new_extension in [
+        ("full_exp_cfg.txt", "json"),
+        ("target_descriptors.npz", None),
+    ]:
         matching_paths = glob.glob(eval_dir + f"/**/{filename}", recursive=True)
         assert len(matching_paths) == 1, f"Found {len(matching_paths)} {filename} files"
         path = matching_paths[0]
-        shutil.copy(path, target_dir)
-        logger.debug(f"Copied {path} to {target_dir}")
+        # Replace extension if necessary
+        target_path = os.path.join(target_dir, filename)
+        if new_extension is not None:
+            target_path = f"{os.path.splitext(target_path)[0]}.{new_extension}"
+        # Copy file to target_path
+        shutil.copy(path, target_path)
+        logger.debug(f"Copied {path} to {target_path}")
 
     # Write a debug JSON file
     debug = {

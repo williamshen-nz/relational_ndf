@@ -1069,8 +1069,8 @@ def main(args):
     os.makedirs(nerf_dataset_dir, exist_ok=True)
     copy_nerf_datasets(eval_dir=eval_save_dir, target_dir=nerf_dataset_dir)
     log_info(f"NeRF datasets copied to {nerf_dataset_dir}")
-    upload_datasets_to_logger(nerf_dataset_dir, exp_name=f"{args.exp}/{args.logger_suffix}")
-    log_info(f"NeRF datasets uploaded to ML-Logger")
+    dataset_prefix = upload_datasets_to_logger(nerf_dataset_dir, exp_name=f"{args.exp}/{args.logger_suffix}")
+    log_info(f"NeRF datasets uploaded to ML-Logger with prefix {dataset_prefix}")
 
 
 def validate_args(args):
