@@ -820,159 +820,160 @@ def main(args):
                 nerf_depths.append(depth)
             log_info(f"Capturing NeRF cameras took: {time.perf_counter() - nerf_cam_start_time:.2f}s")
 
-        log_info(f'[INTERSECTION], Loading model weights for multi NDF inference')
-        load_ndf_weights()
-        pause_mc_thread(True)
-        opt_start_time = time.perf_counter()
-        if args.skip_opt:
-            # Just keep the current pose if skipping optimization
-            relative_trans = np.eye(4)
-        else:
-            relative_trans = infer_relation_intersection(
-                mc_vis, parent_optimizer, child_optimizer,
-                parent_overall_target_desc, child_overall_target_desc,
-                parent_pcd, child_pcd, parent_query_points, child_query_points, opt_visualize=args.opt_visualize)
-        opt_end_time = time.perf_counter()
-        metrics = {
-            "exp": args.exp,
-            "trial": iteration,
-            "infer_relation_intersection_time": opt_end_time - opt_start_time
-        }
-        log_info(f'[INTERSECTION], Inference took: {opt_end_time - opt_start_time:.2f}s')
-        pause_mc_thread(False)
-
-        time.sleep(1.0)
-
-        # apply the inferred transformation by updating the pose of the child object
-        parent_obj_id = pc_master_dict['parent']['pb_obj_id']
-        child_obj_id = pc_master_dict['child']['pb_obj_id']
-        start_child_pose = np.concatenate(pb_client.get_body_state(child_obj_id)[:2]).tolist()
-        start_child_pose_mat = util.matrix_from_pose(util.list2pose_stamped(start_child_pose))
-        final_child_pose_mat = np.matmul(relative_trans, start_child_pose_mat)
-
-        start_parent_pose = np.concatenate(pb_client.get_body_state(parent_obj_id)[:2]).tolist()
-        start_parent_pose_mat = util.matrix_from_pose(util.list2pose_stamped(start_parent_pose))
-        upright_orientation = upright_orientation_dict[pc_master_dict['parent']['class']]
-        upright_parent_ori_mat = common.quat2rot(upright_orientation)
-
-        pb_client.set_step_sim(True)
-        if pc_master_dict['parent']['load_pose_type'] == 'any_pose':
-            # get the relative transformation to make it upright
-            upright_parent_pose_mat = copy.deepcopy(start_parent_pose_mat); upright_parent_pose_mat[:-1, :-1] = upright_parent_ori_mat
-            relative_upright_pose_mat = np.matmul(upright_parent_pose_mat, np.linalg.inv(start_parent_pose_mat))
-
-            upright_parent_pos, upright_parent_ori = start_parent_pose[:3], common.rot2quat(upright_parent_ori_mat)
-            pb_client.reset_body(parent_obj_id, upright_parent_pos, upright_parent_ori)
-
-            final_child_pose_mat = np.matmul(relative_upright_pose_mat, final_child_pose_mat)
-
-        final_child_pose_list = util.pose_stamped2list(util.pose_from_matrix(final_child_pose_mat))
-        final_child_pos, final_child_ori = final_child_pose_list[:3], final_child_pose_list[3:]
-
-        # apply computed final pose by resetting the state
-        pb_client.reset_body(child_obj_id, final_child_pos, final_child_ori)
-        if pc_master_dict['parent']['class'] not in ['syn_rack_easy', 'syn_rack_med']:
-            safeRemoveConstraint(pc_master_dict['parent']['o_cid'])
-        if pc_master_dict['child']['class'] not in ['syn_rack_easy', 'syn_rack_med']:
-            safeRemoveConstraint(pc_master_dict['child']['o_cid'])
-
-        final_child_pcd = util.transform_pcd(pc_obs_info['pcd']['child'], relative_trans)
-        with recorder.meshcat_scene_lock:
-            util.meshcat_pcd_show(mc_vis, final_child_pcd, color=[255, 0, 255], name='scene/final_child_pcd')
-        # safeCollisionFilterPair(pc_master_dict['child']['pb_obj_id'], table_id, -1, -1, enableCollision=False)
-        safeCollisionFilterPair(pc_master_dict['child']['pb_obj_id'], table_id, -1, table_base_id, enableCollision=False)
-
-        time.sleep(3.0)
-
-        # turn on the physics and let things settle to evaluate success/failure
-        pb_client.set_step_sim(False)
-
-        # evaluation criteria
-        time.sleep(2.0)
-
+        metrics = {"exp": args.exp, "trial": iteration, "generate_dataset_only": args.generate_dataset_only}
         success_crit_dict = {}
         kvs = {}
 
-        obj_surf_contacts = p.getContactPoints(pc_master_dict['child']['pb_obj_id'], pc_master_dict['parent']['pb_obj_id'], -1, -1)
-        touching_surf = len(obj_surf_contacts) > 0
-        success_crit_dict['touching_surf'] = touching_surf
-        if parent_class == 'syn_container' and child_class == 'bottle':
-            bottle_final_pose = np.concatenate(p.getBasePositionAndOrientation(pc_master_dict['child']['pb_obj_id'])[:2]).tolist()
+        if not args.generate_dataset_only:
+            log_info(f'[INTERSECTION], Loading model weights for multi NDF inference')
+            load_ndf_weights()
+            pause_mc_thread(True)
+            opt_start_time = time.perf_counter()
+            if args.skip_opt:
+                # Just keep the current pose if skipping optimization
+                relative_trans = np.eye(4)
+            else:
+                relative_trans = infer_relation_intersection(
+                    mc_vis, parent_optimizer, child_optimizer,
+                    parent_overall_target_desc, child_overall_target_desc,
+                    parent_pcd, child_pcd, parent_query_points, child_query_points, opt_visualize=args.opt_visualize)
+            opt_end_time = time.perf_counter()
+            metrics["infer_relation_intersection_time"] = opt_end_time - opt_start_time
+            log_info(f'[INTERSECTION], Inference took: {opt_end_time - opt_start_time:.2f}s')
+            pause_mc_thread(False)
 
-            # get the y-axis in the body frame
-            bottle_body_y = common.quat2rot(bottle_final_pose[3:])[:, 1]
-            bottle_body_y = bottle_body_y / np.linalg.norm(bottle_body_y)
+            time.sleep(1.0)
 
-            # get the angle deviation from the vertical
-            angle_from_upright = util.angle_from_3d_vectors(bottle_body_y, np.array([0, 0, 1]))
-            bottle_upright = angle_from_upright < args.upright_ori_diff_thresh
-            success_crit_dict['bottle_upright'] = bottle_upright
+            # apply the inferred transformation by updating the pose of the child object
+            parent_obj_id = pc_master_dict['parent']['pb_obj_id']
+            child_obj_id = pc_master_dict['child']['pb_obj_id']
+            start_child_pose = np.concatenate(pb_client.get_body_state(child_obj_id)[:2]).tolist()
+            start_child_pose_mat = util.matrix_from_pose(util.list2pose_stamped(start_child_pose))
+            final_child_pose_mat = np.matmul(relative_trans, start_child_pose_mat)
 
-        # take an image to make sure it looks good (post-process)
-        eval_rgb = eval_cam.get_images(get_rgb=True)[0]
-        eval_img_fname = osp.join(eval_imgs_dir, f'{iteration}.png')
-        util.np2img(eval_rgb.astype(np.uint8), eval_img_fname)
+            start_parent_pose = np.concatenate(pb_client.get_body_state(parent_obj_id)[:2]).tolist()
+            start_parent_pose_mat = util.matrix_from_pose(util.list2pose_stamped(start_parent_pose))
+            upright_orientation = upright_orientation_dict[pc_master_dict['parent']['class']]
+            upright_parent_ori_mat = common.quat2rot(upright_orientation)
 
-        ##########################################################################
-        # upside down check for too much inter-penetration
-        pb_client.set_step_sim(True)
+            pb_client.set_step_sim(True)
+            if pc_master_dict['parent']['load_pose_type'] == 'any_pose':
+                # get the relative transformation to make it upright
+                upright_parent_pose_mat = copy.deepcopy(start_parent_pose_mat); upright_parent_pose_mat[:-1, :-1] = upright_parent_ori_mat
+                relative_upright_pose_mat = np.matmul(upright_parent_pose_mat, np.linalg.inv(start_parent_pose_mat))
 
-        # remove constraints, if there are any
-        safeRemoveConstraint(pc_master_dict['parent']['o_cid'])
-        safeRemoveConstraint(pc_master_dict['child']['o_cid'])
+                upright_parent_pos, upright_parent_ori = start_parent_pose[:3], common.rot2quat(upright_parent_ori_mat)
+                pb_client.reset_body(parent_obj_id, upright_parent_pos, upright_parent_ori)
 
-        # first, reset everything
-        pb_client.reset_body(parent_obj_id, start_parent_pose[:3], start_parent_pose[3:])
-        pb_client.reset_body(child_obj_id, start_child_pose[:3], start_child_pose[3:])
+                final_child_pose_mat = np.matmul(relative_upright_pose_mat, final_child_pose_mat)
 
-        # then, compute a new position + orientation for the parent object, that is upside down
-        upside_down_ori_mat = np.matmul(common.euler2rot([np.pi, 0, 0]), upright_parent_ori_mat)
-        upside_down_pose_mat = np.eye(4); upside_down_pose_mat[:-1, :-1] = upside_down_ori_mat; upside_down_pose_mat[:-1, -1] = start_parent_pose[:3]
-        upside_down_pose_mat[2, -1] += 0.15  # move up in z a bit
-        parent_upside_down_pose_list = util.pose_stamped2list(util.pose_from_matrix(upside_down_pose_mat))
+            final_child_pose_list = util.pose_stamped2list(util.pose_from_matrix(final_child_pose_mat))
+            final_child_pos, final_child_ori = final_child_pose_list[:3], final_child_pose_list[3:]
 
-        # reset parent to this state and constrain to world
-        pb_client.reset_body(parent_obj_id, parent_upside_down_pose_list[:3], parent_upside_down_pose_list[3:])
-        ud_cid = constraint_obj_world(parent_obj_id, parent_upside_down_pose_list[:3], parent_upside_down_pose_list[3:])
+            # apply computed final pose by resetting the state
+            pb_client.reset_body(child_obj_id, final_child_pos, final_child_ori)
+            if pc_master_dict['parent']['class'] not in ['syn_rack_easy', 'syn_rack_med']:
+                safeRemoveConstraint(pc_master_dict['parent']['o_cid'])
+            if pc_master_dict['child']['class'] not in ['syn_rack_easy', 'syn_rack_med']:
+                safeRemoveConstraint(pc_master_dict['child']['o_cid'])
 
-        # get the final relative pose of the child object
-        final_child_pose_parent = util.convert_reference_frame(
-            pose_source=util.pose_from_matrix(final_child_pose_mat),
-            pose_frame_target=util.pose_from_matrix(start_parent_pose_mat),
-            pose_frame_source=util.unit_pose()
-        )
-        # get the final world frame pose of the child object in upside down pose
-        final_child_pose_upside_down = util.convert_reference_frame(
-            pose_source=final_child_pose_parent,
-            pose_frame_target=util.unit_pose(),
-            pose_frame_source=util.pose_from_matrix(upside_down_pose_mat)
-        )
-        final_child_pose_upside_down_list = util.pose_stamped2list(final_child_pose_upside_down)
-        final_child_pose_upside_down_mat = util.matrix_from_pose(final_child_pose_upside_down)
+            final_child_pcd = util.transform_pcd(pc_obs_info['pcd']['child'], relative_trans)
+            with recorder.meshcat_scene_lock:
+                util.meshcat_pcd_show(mc_vis, final_child_pcd, color=[255, 0, 255], name='scene/final_child_pcd')
+            # safeCollisionFilterPair(pc_master_dict['child']['pb_obj_id'], table_id, -1, -1, enableCollision=False)
+            safeCollisionFilterPair(pc_master_dict['child']['pb_obj_id'], table_id, -1, table_base_id, enableCollision=False)
 
-        # reset child to this state
-        pb_client.reset_body(child_obj_id, final_child_pose_upside_down_list[:3], final_child_pose_upside_down_list[3:])
+            time.sleep(3.0)
 
-        # turn on the simulation and wait for a couple seconds
-        pb_client.set_step_sim(False)
-        time.sleep(2.0)
+            # turn on the physics and let things settle to evaluate success/failure
+            pb_client.set_step_sim(False)
 
-        # check if they are still in contact (they shouldn't be)
-        ud_obj_surf_contacts = p.getContactPoints(parent_obj_id, child_obj_id, -1, -1)
-        ud_touching_surf = len(ud_obj_surf_contacts) > 0
-        success_crit_dict['fell_off_upside_down'] = not ud_touching_surf
+            # evaluation criteria
+            time.sleep(2.0)
+
+            obj_surf_contacts = p.getContactPoints(pc_master_dict['child']['pb_obj_id'], pc_master_dict['parent']['pb_obj_id'], -1, -1)
+            touching_surf = len(obj_surf_contacts) > 0
+            success_crit_dict['touching_surf'] = touching_surf
+            if parent_class == 'syn_container' and child_class == 'bottle':
+                bottle_final_pose = np.concatenate(p.getBasePositionAndOrientation(pc_master_dict['child']['pb_obj_id'])[:2]).tolist()
+
+                # get the y-axis in the body frame
+                bottle_body_y = common.quat2rot(bottle_final_pose[3:])[:, 1]
+                bottle_body_y = bottle_body_y / np.linalg.norm(bottle_body_y)
+
+                # get the angle deviation from the vertical
+                angle_from_upright = util.angle_from_3d_vectors(bottle_body_y, np.array([0, 0, 1]))
+                bottle_upright = angle_from_upright < args.upright_ori_diff_thresh
+                success_crit_dict['bottle_upright'] = bottle_upright
+
+                kvs['Angle From Upright'] = angle_from_upright
+
+            # take an image to make sure it looks good (post-process)
+            eval_rgb = eval_cam.get_images(get_rgb=True)[0]
+            eval_img_fname = osp.join(eval_imgs_dir, f'{iteration}.png')
+            util.np2img(eval_rgb.astype(np.uint8), eval_img_fname)
+
+            ##########################################################################
+            # upside down check for too much inter-penetration
+            pb_client.set_step_sim(True)
+
+            # remove constraints, if there are any
+            safeRemoveConstraint(pc_master_dict['parent']['o_cid'])
+            safeRemoveConstraint(pc_master_dict['child']['o_cid'])
+
+            # first, reset everything
+            pb_client.reset_body(parent_obj_id, start_parent_pose[:3], start_parent_pose[3:])
+            pb_client.reset_body(child_obj_id, start_child_pose[:3], start_child_pose[3:])
+
+            # then, compute a new position + orientation for the parent object, that is upside down
+            upside_down_ori_mat = np.matmul(common.euler2rot([np.pi, 0, 0]), upright_parent_ori_mat)
+            upside_down_pose_mat = np.eye(4); upside_down_pose_mat[:-1, :-1] = upside_down_ori_mat; upside_down_pose_mat[:-1, -1] = start_parent_pose[:3]
+            upside_down_pose_mat[2, -1] += 0.15  # move up in z a bit
+            parent_upside_down_pose_list = util.pose_stamped2list(util.pose_from_matrix(upside_down_pose_mat))
+
+            # reset parent to this state and constrain to world
+            pb_client.reset_body(parent_obj_id, parent_upside_down_pose_list[:3], parent_upside_down_pose_list[3:])
+            ud_cid = constraint_obj_world(parent_obj_id, parent_upside_down_pose_list[:3], parent_upside_down_pose_list[3:])
+
+            # get the final relative pose of the child object
+            final_child_pose_parent = util.convert_reference_frame(
+                pose_source=util.pose_from_matrix(final_child_pose_mat),
+                pose_frame_target=util.pose_from_matrix(start_parent_pose_mat),
+                pose_frame_source=util.unit_pose()
+            )
+            # get the final world frame pose of the child object in upside down pose
+            final_child_pose_upside_down = util.convert_reference_frame(
+                pose_source=final_child_pose_parent,
+                pose_frame_target=util.unit_pose(),
+                pose_frame_source=util.pose_from_matrix(upside_down_pose_mat)
+            )
+            final_child_pose_upside_down_list = util.pose_stamped2list(final_child_pose_upside_down)
+            final_child_pose_upside_down_mat = util.matrix_from_pose(final_child_pose_upside_down)
+
+            # reset child to this state
+            pb_client.reset_body(child_obj_id, final_child_pose_upside_down_list[:3], final_child_pose_upside_down_list[3:])
+
+            # turn on the simulation and wait for a couple seconds
+            pb_client.set_step_sim(False)
+            time.sleep(2.0)
+
+            # check if they are still in contact (they shouldn't be)
+            ud_obj_surf_contacts = p.getContactPoints(parent_obj_id, child_obj_id, -1, -1)
+            ud_touching_surf = len(ud_obj_surf_contacts) > 0
+            success_crit_dict['fell_off_upside_down'] = not ud_touching_surf
 
         #########################################################################
 
-        place_success = np.all(np.asarray(list(success_crit_dict.values())))
+        if not success_crit_dict:
+            assert args.generate_dataset_only, "success_crit_dict is empty, but args.generate_dataset_only is False"
+            place_success = False
+        else:
+            place_success = np.all(np.asarray(list(success_crit_dict.values())))
 
         place_success_list.append(place_success)
         log_str = 'Iteration: %d, ' % iteration
 
         kvs['Place Success'] = sum(place_success_list) / float(len(place_success_list))
-
-        if parent_class == 'syn_container' and child_class == 'bottle':
-            kvs['Angle From Upright'] = angle_from_upright
 
         for k, v in kvs.items():
             log_str += '%s: %.3f, ' % (k, v)
@@ -1009,17 +1010,8 @@ def main(args):
         results_txt_dict['success_criteria_dict'] = success_crit_dict
         open(results_txt_fname, 'w').write(str(results_txt_dict))
 
-        # Metrics that Will added
-        metrics["rndf_results"] = {
-            "place_success": place_success,
-            "success_criteria_dict": success_crit_dict,
-        }
-        metrics_fname = osp.join(eval_iter_dir, 'metrics.json')
-        with open(metrics_fname, 'w') as f:
-            json.dump(metrics, f, indent=2, default=str)
-
-        eval_img_fname2 = osp.join(eval_iter_dir, f'{iteration}.png')
-        util.np2img(eval_rgb.astype(np.uint8), eval_img_fname2)
+        # eval_img_fname2 = osp.join(eval_iter_dir, f'{iteration}.png')
+        # util.np2img(eval_rgb.astype(np.uint8), eval_img_fname2)
 
         # Write NeRF images
         if not args.disable_nerf_cams:
@@ -1045,6 +1037,15 @@ def main(args):
             with open(metadata_fname, 'w') as f:
                 json.dump(metadata, f, indent=2, default=str)
 
+            # Metrics that Will added
+            metrics["rndf_results"] = {
+                "place_success": place_success,
+                "success_criteria_dict": success_crit_dict,
+            }
+            metrics_fname = osp.join(nerf_dir, "rndf_metrics.json")
+            with open(metrics_fname, "w") as f:
+                json.dump(metrics, f, indent=2, default=str)
+
             log_info(f"Wrote NeRF dataset to {nerf_dir}")
 
         pause_mc_thread(True)
@@ -1065,12 +1066,15 @@ def main(args):
         logger.info("Skipping NeRF dataset copy.")
         return
 
+    # Copy datasets for this experiment to the nerf_datasets directory
     nerf_dataset_dir = osp.join(path_util.get_rndf_nerf_datasets(), args.exp)
     os.makedirs(nerf_dataset_dir, exist_ok=True)
     copy_nerf_datasets(eval_dir=eval_save_dir, target_dir=nerf_dataset_dir)
     log_info(f"NeRF datasets copied to {nerf_dataset_dir}")
+
+    # Copy datasets to ml-logger
     dataset_prefix = upload_datasets_to_logger(nerf_dataset_dir, exp_name=f"{args.exp}/{args.logger_suffix}")
-    log_info(f"NeRF datasets uploaded to ML-Logger with prefix {dataset_prefix}")
+    log_info(f"NeRF datasets uploaded to ml-logger with prefix {dataset_prefix}")
 
 
 def validate_args(args):
@@ -1159,6 +1163,17 @@ if __name__ == "__main__":
     parser.add_argument("--disable_nerf_dataset_copy", action="store_true",
                         help="Disable copying NeRF dataset to the dedicated rndf_robot/nerf_datasets folder")
 
+    parser.add_argument("--generate_dataset_only", action="store_true",
+                        help="Only generate the datasets, skip any actual evaluation.")
+
     args = parser.parse_args()
     validate_args(args)
+    start_time = time.perf_counter()
     main(args)
+    end_time = time.perf_counter()
+
+    duration = end_time - start_time
+    avg_duration = duration / args.num_iterations
+    print(f"Total time: {duration:.2f} seconds")
+    print(f"Num iterations: {args.num_iterations}")
+    print(f"Average time per iteration: {avg_duration:.2f} seconds")

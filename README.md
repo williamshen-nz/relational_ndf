@@ -1,15 +1,15 @@
 # Relational Neural Descriptor Fields (R-NDF)
-This is a modified implementation of R-NDF with some additional features, including
+This is a modified implementation of R-NDF with some additional features targeted for extracting images for a NeRF:
 
-- Capturing a dataset for training a NeRF
-  - By default we capture 36 views around the center of the table.
-  - You can modify the configuration in [src/rndf_robot/config/default_nerf_cfg.py](src/rndf_robot/config/default_nerf_cfg.py)
-- CPU-only support
-  - You can evaluate R-NDF on CPU (e.g. M1 Mac). No configuration are special flags needed.
-  - Note that the evaluation is super slow on CPU, you may want to adjust the `--opt-iterations` flag.
-- Minor improved functionality for PyBullet including:
-  - Loading textures/colors randomly for the objects and table
-  - By default disabling the debug visualizer which slows things down
+1. Capturing a dataset for training a NeRF
+   - By default we capture 36 views around the center of the table.
+   - You can modify the configuration in [src/rndf_robot/config/default_nerf_cfg.py](src/rndf_robot/config/default_nerf_cfg.py)
+2. CPU-only support
+    - You can evaluate R-NDF on CPU (e.g. M1 Mac). No configuration are special flags needed.
+    - Note that the evaluation is super slow on CPU, you may want to adjust the `--opt-iterations` flag.
+3. Minor improved functionality for PyBullet including:
+    - Loading textures for the table, and random colors for the object meshes
+    - Disabling the debug visualizer which slows things down
 
 Please see [OG_README.md](OG_README.md) for the original README file. The installation instructions are all there.
 There may be other hacks you will need to do to get this version of the codebase working.
@@ -34,11 +34,14 @@ ___
 The NeRF datasets are written in the [instant-ngp](https://github.com/NVlabs/instant-ngp/) `transforms.json` format.
 As a result, they are immediately compatible with [instant-ngp](https://github.com/NVlabs/instant-ngp/) and 
 [nerfstudio](https://github.com/nerfstudio-project/nerfstudio/).
-For nerfstudio, you can use either the `nerfstudio-data` or `instant-ngp` data parser.
 
+For nerfstudio, you can use either the `nerfstudio-data` data parser. You will need to disable camera pose optimization,
+centering the poses, etc.
 
 We automatically compute the center of attention and a scale so the transforms are within the
 unit cube. You may need to find tune the scale further based on your NeRF implementation.
+
+Note: the camera poses are in z-up convention, which matches nerfstudio.
 
 ### Dataset Structure
 We create the following dataset for each trial in the `evaluate_relations_multi_ndf.py` script:
@@ -58,6 +61,7 @@ nerf_dataset/
     and how to reverse the normalization.
 - `transforms.json` contains the normalized camera poses and intrinsics in `instant-ngp` format.
 - `transforms_unnormalized.json` contains the unnormalized camera poses and intrinsics in `instant-ngp` format.
+- other things not documented yet...
 
 **Note:** you can disable the NeRF dataset generation using the `--disable_nerf_cams` in 
 the `evaluate_relations_multi_ndf.py` script.
