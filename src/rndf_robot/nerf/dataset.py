@@ -70,7 +70,8 @@ def find_transforms_center_and_scale(raw_transforms: dict) -> (np.ndarray, float
     # Will Shen comment: don't want to scale it too much, avglen ensures unit cube covers the scene
     # dividing by 1.5 qualitatively looks good in nerfstudio.
     # scale = 4.0 / avglen  # scale to "nerf sized"
-    scale = avglen / 1.5
+    # scale = 1 seems to be fine
+    scale = 1  # avglen / 1.5
 
     return translation, scale
 
@@ -140,8 +141,9 @@ def write_instant_ngp_dataset(
         )
 
         c2w = cam.get_cam_ext()
-        # Convert to graphics convention - some funny stuff going on
-        c2w = graphics_transformation @ c2w
+        # Uncomment to convert to graphics convention.
+        # nerfstudio uses z-up by default which is same as robot convention as we're fine
+        # c2w = graphics_transformation @ c2w
 
         # Convert to Instant-NGP convention
         c2w = convert_pose(c2w)
