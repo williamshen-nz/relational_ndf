@@ -4,7 +4,7 @@ from params_proto import ParamsProto, Proto
 
 class UploadDatasetsArgs(ParamsProto):
     base_prefix: str = Proto(
-        "instant-feature-distillation/datasets/baselines/rndf",
+        "instant-feature/datasets/rndf",
         help="Base prefix for R-NDF datasets on ml-logger",
     )
 
